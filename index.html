@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRON AGE — Tactical Brawler</title>
+<style>
+  :root {
+    --teamA: #c1502e;
+    --teamB: #3d7ea6;
+    --bone: #e8dcc0;
+    --ink: #14100c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0b08; }
+  body { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; color: var(--bone); }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  .hud { position: fixed; pointer-events: none; user-select: none; }
+  .hidden { display: none !important; }
+  #crosshair { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px;
+    border-radius: 50%; background: rgba(232,220,192,.9); box-shadow: 0 0 4px #000; }
+  #crosshair.hit { background: #ffd24a; transform: translate(-50%,-50%) scale(2.2); }
+  #crosshair.kill { background: #ff4a3d; transform: translate(-50%,-50%) scale(3); }
+
+  #topbar { top: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
+  #score { font-size: 28px; font-weight: 700; letter-spacing: 2px; text-shadow: 0 2px 4px #000; }
+  #score .a { color: var(--teamA); } #score .b { color: var(--teamB); }
+  #timer { font-size: 15px; opacity: .9; margin-top: 2px; text-shadow: 0 1px 3px #000; }
+  #roundline { font-size: 12px; opacity: .75; letter-spacing: 3px; text-transform: uppercase; }
+  #alive { display: flex; gap: 18px; justify-content: center; margin-top: 4px; font-size: 13px; }
+  #alive .a { color: var(--teamA); } #alive .b { color: var(--teamB); }
+
+  #vitals { left: 24px; bottom: 24px; width: 240px; }
+  .bar { height: 14px; background: rgba(0,0,0,.55); border: 1px solid rgba(232,220,192,.35);
+    margin-top: 6px; }
+  .bar > div { height: 100%; transition: width .08s linear; }
+  #hpfill { background: linear-gradient(90deg, #8c2f1b, #c1502e); }
+  #stfill { background: linear-gradient(90deg, #6d6a4f, #b8b182); }
+  #vitals label { font-size: 11px; letter-spacing: 2px; opacity: .8; text-shadow: 0 1px 2px #000; }
+
+  #weapon { right: 24px; bottom: 24px; text-align: right; text-shadow: 0 1px 3px #000; }
+  #weapon .name { font-size: 18px; font-weight: 700; }
+  #weapon .sub { font-size: 12px; opacity: .8; }
+
+  #feed { right: 18px; top: 64px; font-size: 13px; text-align: right; text-shadow: 0 1px 3px #000; }
+  #feed div { margin-bottom: 3px; opacity: .95; }
+  #feed .a { color: var(--teamA); } #feed .b { color: var(--teamB); }
+  #feed .me { font-weight: 700; }
+
+  #banner { left: 50%; top: 30%; transform: translate(-50%,-50%); text-align: center;
+    text-shadow: 0 2px 8px #000; }
+  #banner .big { font-size: 46px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; }
+  #banner .small { font-size: 16px; letter-spacing: 2px; opacity: .9; margin-top: 6px; }
+  #banner.hidden { display: none; }
+
+  #vignette { inset: 0; box-shadow: inset 0 0 120px rgba(140,20,8,0); transition: box-shadow .1s; }
+  #vignette.hurt { box-shadow: inset 0 0 140px rgba(140,20,8,.85); }
+
+  #objective { left: 24px; top: 64px; font-size: 13px; max-width: 260px;
+    background: rgba(0,0,0,.4); border: 1px solid rgba(232,220,192,.25);
+    padding: 8px 10px; line-height: 1.5; }
+  #objective .title { font-weight: 700; letter-spacing: 2px; font-size: 11px; opacity: .8; }
+
+  #overlay { inset: 0; background: radial-gradient(ellipse at center, rgba(20,16,12,.88), rgba(8,6,4,.97));
+    display: flex; align-items: center; justify-content: center; pointer-events: auto; z-index: 10; }
+  #overlay.hidden { display: none; }
+  #panel { max-width: 640px; text-align: center; padding: 40px; }
+  #panel h1 { font-size: 44px; letter-spacing: 8px; color: var(--bone); }
+  #panel h1 span { color: var(--teamA); }
+  #panel h2 { font-size: 13px; letter-spacing: 4px; opacity: .7; margin: 6px 0 26px; font-weight: 400; }
+  #loadouts { display: flex; gap: 10px; justify-content: center; margin: 18px 0 24px; flex-wrap: wrap; }
+  .card { width: 112px; padding: 12px 8px; border: 1px solid rgba(232,220,192,.3); cursor: pointer;
+    background: rgba(0,0,0,.35); transition: all .12s; }
+  .card:hover { border-color: var(--bone); }
+  .card.sel { border-color: #ffd24a; background: rgba(255,210,74,.08); }
+  .card .cn { font-weight: 700; font-size: 14px; margin-bottom: 5px; }
+  .card .cd { font-size: 11px; opacity: .75; line-height: 1.35; }
+  .card .key { font-size: 10px; opacity: .6; margin-top: 6px; }
+  #panel .go { font-size: 15px; letter-spacing: 2px; opacity: .95; margin-top: 8px; }
+  #panel .go b { color: #ffd24a; }
+  #controls { margin-top: 26px; font-size: 12px; opacity: .65; line-height: 1.9;
+    column-count: 2; text-align: left; }
+  #controls b { color: var(--bone); }
+  #modebar { margin-top: 14px; font-size: 12px; letter-spacing: 2px; opacity: .8; }
+  #modebar b { color: #ffd24a; cursor: pointer; pointer-events: auto; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="vignette" class="hud"></div>
+<div id="crosshair" class="hud"></div>
+
+<div id="topbar" class="hud">
+  <div id="score"><span class="a" id="scoreA">0</span> : <span class="b" id="scoreB">0</span></div>
+  <div id="timer">2:00</div>
+  <div id="roundline">Round 1</div>
+  <div id="alive"><span class="a" id="aliveA"></span><span class="b" id="aliveB"></span></div>
+  <div id="bannermeter" class="hidden" style="margin:7px auto 0;width:240px;height:10px;position:relative;
+    background:rgba(0,0,0,.55);border:1px solid rgba(232,220,192,.35)">
+    <div id="bmfill" style="position:absolute;top:0;bottom:0;left:50%;width:0;background:#c1502e"></div>
+    <div style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(232,220,192,.6)"></div>
+  </div>
+</div>
+
+<div id="objective" class="hud">
+  <div class="title">OBJECTIVE</div>
+  <div id="objtext">Eliminate the enemy warband.</div>
+</div>
+
+<div id="vitals" class="hud">
+  <label>HEALTH</label>
+  <div class="bar"><div id="hpfill" style="width:100%"></div></div>
+  <label style="margin-top:8px;display:block">STAMINA</label>
+  <div class="bar"><div id="stfill" style="width:100%"></div></div>
+  <div id="mountbar" style="display:none;margin-top:8px">
+    <label id="mountname">COURSER</label>
+    <div class="bar"><div id="mountfill" style="width:100%;background:linear-gradient(90deg,#6b4a2c,#a8845a)"></div></div>
+  </div>
+</div>
+
+<div id="interact" class="hud hidden" style="left:50%;top:58%;transform:translateX(-50%);
+  font-size:15px;letter-spacing:1px;text-shadow:0 1px 3px #000;background:rgba(0,0,0,.45);
+  padding:6px 14px;border:1px solid rgba(232,220,192,.3)"></div>
+
+<div id="weapon" class="hud">
+  <div class="name" id="wname">Iron Gladius</div>
+  <div class="sub" id="wsub">LMB slash · V thrust · RMB shield</div>
+</div>
+
+<div id="feed" class="hud"></div>
+
+<div id="banner" class="hud hidden">
+  <div class="big" id="bannerBig"></div>
+  <div class="small" id="bannerSmall"></div>
+</div>
+
+<div id="overlay">
+  <div id="panel">
+    <h1>IRON <span>AGE</span></h1>
+    <h2>TACTICAL BRAWLER · LAST WARBAND STANDING</h2>
+    <div id="loadouts"></div>
+    <div class="go">Choose your kit, then <b>CLICK TO TAKE THE FIELD</b></div>
+    <div id="modebar">MODE: <b id="modename">ANNIHILATION</b> — press <b>[M]</b> or click to change</div>
+    <div id="controls">
+      <div><b>WASD</b> move · <b>Shift</b> walk slow</div>
+      <div><b>Mouse</b> look · <b>LMB</b> slash</div>
+      <div><b>V</b> thrust (long reach)</div>
+      <div><b>RMB hold</b> raise shield</div>
+      <div><b>F</b> kick (breaks turtles)</div>
+      <div><b>1 / 2</b> melee / ranged weapon</div>
+      <div><b>LMB</b> draw &amp; loose bow / throw pilum</div>
+      <div><b>Space</b> jump · <b>E</b> mount beast</div>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
