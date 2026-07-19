@@ -1,0 +1,31 @@
+{
+  "comment": "Asset queue for the Blender re-asset goal (see GOAL.md). The goal may add entries (e.g. character pose variants) but may not remove these. validate-assets.mjs checks every entry.",
+  "assets": [
+    { "file": "weapons/gladius.glb", "minMeshes": 1, "for": "loadout weapon: legionary" },
+    { "file": "weapons/spear.glb", "minMeshes": 1, "for": "loadout weapon: spearman" },
+    { "file": "weapons/falx.glb", "minMeshes": 1, "for": "loadout weapon: reaver" },
+    { "file": "weapons/dagger.glb", "minMeshes": 1, "for": "loadout weapon: skirmisher/archer" },
+    { "file": "weapons/bow.glb", "minMeshes": 1, "for": "ranged: archer" },
+    { "file": "weapons/javelin.glb", "minMeshes": 1, "for": "ranged: skirmisher" },
+    { "file": "weapons/shield_scutum.glb", "minMeshes": 1, "for": "shield: legionary" },
+    { "file": "weapons/shield_round.glb", "minMeshes": 1, "for": "shield: spearman" },
+
+    { "file": "characters/warrior.glb", "minMeshes": 1, "for": "base humanoid, both teams (team-tinted)" },
+
+    { "file": "mounts/horse.glb", "minMeshes": 1, "for": "mount: courser" },
+    { "file": "mounts/camel.glb", "minMeshes": 1, "for": "mount: dromedary" },
+    { "file": "mounts/elephant.glb", "minMeshes": 1, "for": "mount: war elephant" },
+
+    { "file": "environment/fort_wall.glb", "minMeshes": 1, "for": "arena perimeter + fort structures" },
+    { "file": "environment/watchtower.glb", "minMeshes": 1, "for": "fort watchtower(s)" },
+    { "file": "environment/stone_house.glb", "minMeshes": 1, "for": "flat-roofed stone houses" },
+    { "file": "environment/bazaar_stall.glb", "minMeshes": 1, "for": "market stalls (cover)" },
+    { "file": "environment/gate.glb", "minMeshes": 1, "for": "spawn gates" },
+    { "file": "environment/well.glb", "minMeshes": 1, "for": "mid plaza well" },
+    { "file": "environment/banner_standard.glb", "minMeshes": 1, "for": "the war standard at mid" },
+    { "file": "environment/rocks.glb", "minMeshes": 1, "for": "rock outcrops / scatter" },
+    { "file": "environment/juniper.glb", "minMeshes": 1, "for": "mountain junipers" },
+    { "file": "environment/pine.glb", "minMeshes": 1, "for": "pines" },
+    { "file": "environment/peaks_backdrop.glb", "minMeshes": 1, "for": "Karakoram snow-peak backdrop" }
+  ]
+}
