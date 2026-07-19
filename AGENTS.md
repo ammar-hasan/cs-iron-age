@@ -24,3 +24,21 @@
   that has the MCP tools). Its proof command is `node tools/validate-assets.mjs`,
   which checks `assets/manifest.json` — update the manifest, not the script,
   when the asset queue changes.
+- Blender re-asset pipeline: GLBs live under `assets/` (queue in
+  `assets/manifest.json`), Blender review renders under `assets/renders/` (same
+  relative path, `.png`). `src/assets.js` preloads every GLB at boot through
+  the vendored GLTFLoader (`vendor/loaders/GLTFLoader.js` +
+  `vendor/utils/BufferGeometryUtils.js` — keep the examples/jsm layout, they
+  only import `three`). A missing GLB yields an empty structural fallback
+  (headless tests never load GLBs); procedural asset builders were removed.
+- GLB authoring rules learned: build in Blender facing **-Y** (arrives facing
+  +Z in three), meters, origin at the grip/joint/base. Export flat base colors
+  only — procedural noise→ramp links defeat glTF color export (undefined
+  baseColorFactor = white), so strip color links and write flat
+  `baseColorFactor` colors before export, and cap metallic at 0.75 (the game
+  has no env map). Puppet contract for animated assets: warrior/mount GLBs
+  carry named nodes — `body`, `armR`/`armL` (shoulder empties), `legL`/`legR`,
+  `legFL/FR/BL/BR` (joint-origin), extras `tail`/`trunk`/`earL`/`earR` — the
+  game drives those pivots directly (no skeletal rig). Team tint = clone the
+  `tunic` material per instance. The banner's cloth node must stay named
+  `flag` (world.js tints/animates it).

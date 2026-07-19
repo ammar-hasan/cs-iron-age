@@ -13,6 +13,7 @@ import { Projectiles } from './projectiles.js';
 import { makeMounts } from './mounts.js';
 import * as hud from './hud.js';
 import * as sfx from './audio.js';
+import { loadAssets } from './assets.js';
 
 const MOUNT_ICON = { horse: '🐎', camel: '🐫', elephant: '🐘' };
 
@@ -38,6 +39,9 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Preload Blender GLBs before anything builds meshes (falls back per-asset).
+await loadAssets();
 
 const world = buildWorld(scene);
 hud.initHud();

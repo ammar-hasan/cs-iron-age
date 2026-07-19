@@ -72,7 +72,8 @@ node test/mounts.test.mjs   # mounts: driving, trample, mount death, melee vs be
 ## Layout
 
 - `src/logic.js` — pure, DOM-free game rules: weapons, melee, projectiles, mounts, match + banner state machines
-- `src/world.js` — Oasis Crossing arena: geometry, colliders, spawns
+- `src/world.js` — Hunza Crossing arena (Gilgit-Baltistan mountain fort): GLB set from `assets/`, colliders, spawns
+- `src/assets.js` — GLB preload/registry (Blender-authored models, `assets/manifest.json`)
 - `src/entities.js` — Unit (player/bot shared): humanoid meshes, combat state machine, movement
 - `src/player.js` — first-person rig: input, camera, viewmodel animation
 - `src/ai.js` — bot brains: spacing, strikes, blocks, kicks, archery, cavalry

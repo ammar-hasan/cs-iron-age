@@ -3,114 +3,37 @@
 import * as THREE from 'three';
 import { MOUNTS, TRAMPLE_CD, angDiff, clamp, lerp } from './logic.js';
 import { ARENA } from './world.js';
+import { assetClone } from './assets.js';
 
 // ---------------------------------------------------------------------------
-// Meshes (procedural, readable silhouettes)
+// Meshes (Blender GLBs via assets.js)
 // ---------------------------------------------------------------------------
 
+// Puppet from the Blender GLB: body node for bob/death-roll, hip-origin legs
+// for the gait cycle, optional extras (tail, trunk, ears) for idle motion.
+function mountFromGLB(glb) {
+  const group = new THREE.Group();
+  group.add(glb);
+  const body = glb.getObjectByName('body');
+  const legs = ['legFL', 'legFR', 'legBL', 'legBR'].map((n) => glb.getObjectByName(n));
+  const extras = {};
+  for (const n of ['tail', 'trunk', 'earL', 'earR']) {
+    const o = glb.getObjectByName(n);
+    if (o) extras[n] = o;
+  }
+  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return { group, body, legs, extras };
+}
+
+// Meshes come from the Blender GLBs. When the cache is cold (headless tests)
+// a bare structural fallback keeps Mount's animation handles valid.
 function makeMountMesh(kind) {
+  const glb = assetClone(kind);   // horse, camel, elephant
+  if (glb) return mountFromGLB(glb);
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);
-  const legs = [];
-  const extras = {};
-
-  const hide = new THREE.MeshStandardMaterial({
-    color: kind === 'horse' ? 0x6b4a2c : kind === 'camel' ? 0xb09268 : 0x7a7d82,
-    roughness: 0.9,
-  });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x3d2c1a, roughness: 0.95 });
-  const ivory = new THREE.MeshStandardMaterial({ color: 0xe0d6bd, roughness: 0.6 });
-  const tack = new THREE.MeshStandardMaterial({ color: 0x8a2f23, roughness: 0.8 });
-
-  const box = (mat, w, h, d, x, y, z, parent = body) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(x, y, z);
-    m.castShadow = true;
-    parent.add(m);
-    return m;
-  };
-  const leg = (x, z, len, thick, hipY) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, hipY, z);
-    const m = new THREE.Mesh(new THREE.BoxGeometry(thick, len, thick), hide);
-    m.position.y = -len / 2;
-    m.castShadow = true;
-    pivot.add(m);
-    body.add(pivot);
-    legs.push(pivot);
-  };
-
-  if (kind === 'horse') {
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 1.25, 3, 8), hide);
-    torso.rotation.x = Math.PI / 2;
-    torso.position.y = 1.15;
-    torso.castShadow = true;
-    body.add(torso);
-    box(hide, 0.26, 0.55, 0.3, 0, 1.55, 0.75).rotation.x = -0.5;      // neck
-    box(hide, 0.22, 0.28, 0.55, 0, 1.85, 1.05);                      // head
-    box(dark, 0.08, 0.4, 0.5, 0, 1.78, 0.72);                        // mane
-    leg(-0.25, 0.55, 0.85, 0.13, 1.0); leg(0.25, 0.55, 0.85, 0.13, 1.0);
-    leg(-0.25, -0.6, 0.85, 0.13, 1.0); leg(0.25, -0.6, 0.85, 0.13, 1.0);
-    extras.tail = box(dark, 0.09, 0.6, 0.09, 0, 1.15, -1.05);
-    box(tack, 0.5, 0.14, 0.6, 0, 1.52, -0.05);                       // saddle
-  } else if (kind === 'camel') {
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.35, 3, 8), hide);
-    torso.rotation.x = Math.PI / 2;
-    torso.position.y = 1.5;
-    torso.castShadow = true;
-    body.add(torso);
-    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 6), hide);
-    hump.scale.set(0.9, 1.1, 1.2);
-    hump.position.y = 1.95;
-    hump.castShadow = true;
-    body.add(hump);
-    box(hide, 0.22, 0.9, 0.26, 0, 2.0, 0.85).rotation.x = -0.25;     // neck
-    box(hide, 0.2, 0.24, 0.5, 0, 2.5, 1.05);                         // head
-    leg(-0.28, 0.6, 1.2, 0.14, 1.35); leg(0.28, 0.6, 1.2, 0.14, 1.35);
-    leg(-0.28, -0.65, 1.2, 0.14, 1.35); leg(0.28, -0.65, 1.2, 0.14, 1.35);
-    box(tack, 0.55, 0.14, 0.65, 0, 2.02, -0.35);                     // saddle
-  } else {
-    // war elephant
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.95, 1.7, 4, 10), hide);
-    torso.rotation.x = Math.PI / 2;
-    torso.position.y = 1.7;
-    torso.castShadow = true;
-    body.add(torso);
-    const headM = new THREE.Mesh(new THREE.SphereGeometry(0.65, 10, 8), hide);
-    headM.position.set(0, 2.3, 1.35);
-    headM.castShadow = true;
-    body.add(headM);
-    extras.earL = box(hide, 0.08, 0.7, 0.55, -0.62, 2.35, 1.2);
-    extras.earR = box(hide, 0.08, 0.7, 0.55, 0.62, 2.35, 1.2);
-    // trunk: stacked tapering segments
-    const trunk = new THREE.Group();
-    trunk.position.set(0, 2.05, 1.8);
-    for (let i = 0; i < 3; i++) {
-      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.14 - i * 0.03, 0.17 - i * 0.03, 0.5, 6), hide);
-      seg.position.set(0, -0.3 - i * 0.42, 0.08 + i * 0.1);
-      seg.castShadow = true;
-      trunk.add(seg);
-    }
-    body.add(trunk);
-    extras.trunk = trunk;
-    // tusks
-    for (const s of [-1, 1]) {
-      const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.7, 6), ivory);
-      tusk.position.set(s * 0.32, 1.8, 1.75);
-      tusk.rotation.x = Math.PI / 2.6;
-      tusk.castShadow = true;
-      body.add(tusk);
-    }
-    leg(-0.55, 0.7, 1.3, 0.3, 1.35); leg(0.55, 0.7, 1.3, 0.3, 1.35);
-    leg(-0.55, -0.8, 1.3, 0.3, 1.35); leg(0.55, -0.8, 1.3, 0.3, 1.35);
-    // howdah (riding platform)
-    box(tack, 1.0, 0.5, 1.0, 0, 2.85, -0.2);
-    box(dark, 0.9, 0.1, 0.9, 0, 2.62, -0.2);
-  }
-
-  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  return { group, body, legs, extras };
+  return { group, body, legs: [], extras: {} };
 }
 
 // ---------------------------------------------------------------------------

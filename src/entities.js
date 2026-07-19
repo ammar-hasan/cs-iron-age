@@ -6,12 +6,9 @@ import {
   STAMINA_REGEN, STAMINA_REGEN_DELAY, forwardVec, inArc, clamp, lerp,
 } from './logic.js';
 import { ARENA } from './world.js';
+import { assetClone } from './assets.js';
 
 export const TEAM_COLOR = { A: 0xa33f2c, B: 0x2e5d75 };
-const SKIN = 0xc9a079;
-const IRON = 0x5a5f66;
-const BRONZE = 0xa87f3f;
-const WOOD = 0x6e4f2f;
 
 export const BOT_NAMES = [
   'Brontes', 'Axion', 'Korax', 'Dravo', 'Esun', 'Vedic', 'Marro', 'Talos', 'Ogma', 'Rix',
@@ -21,135 +18,53 @@ export const BOT_NAMES = [
 let uid = 0;
 
 // ---------------------------------------------------------------------------
-// Mesh builders
+// Mesh builders — Blender GLBs (see assets/manifest.json). When the cache is
+// cold (headless tests) they return empty groups, never procedural geometry.
 // ---------------------------------------------------------------------------
 
 export function weaponMesh(id) {
-  const g = new THREE.Group();
-  const iron = new THREE.MeshStandardMaterial({ color: IRON, roughness: 0.45, metalness: 0.7 });
-  const wood = new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.85 });
-  const bronze = new THREE.MeshStandardMaterial({ color: BRONZE, roughness: 0.5, metalness: 0.6 });
-  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    m.rotation.set(rx, ry, rz);
-    m.castShadow = true;
-    g.add(m);
-    return m;
-  };
-  if (id === 'gladius') {
-    add(new THREE.BoxGeometry(0.045, 0.62, 0.10), iron, 0, 0.45, 0);
-    add(new THREE.BoxGeometry(0.16, 0.05, 0.05), bronze, 0, 0.13, 0);
-    add(new THREE.CylinderGeometry(0.025, 0.03, 0.16, 6), wood, 0, 0.02, 0);
-  } else if (id === 'spear') {
-    add(new THREE.CylinderGeometry(0.025, 0.03, 2.3, 6), wood, 0, 0.55, 0);
-    add(new THREE.ConeGeometry(0.05, 0.3, 6), iron, 0, 1.85, 0);
-    add(new THREE.SphereGeometry(0.045, 6, 5), bronze, 0, -0.62, 0);
-  } else if (id === 'falx') {
-    add(new THREE.CylinderGeometry(0.03, 0.035, 0.9, 6), wood, 0, 0.1, 0);
-    const blade = add(new THREE.BoxGeometry(0.05, 0.85, 0.14), iron, 0, 0.8, 0.1);
-    blade.rotation.x = 0.35;
-    add(new THREE.BoxGeometry(0.14, 0.05, 0.05), bronze, 0, 0.42, 0);
-  } else if (id === 'dagger') {
-    add(new THREE.BoxGeometry(0.035, 0.32, 0.07), iron, 0, 0.26, 0);
-    add(new THREE.CylinderGeometry(0.02, 0.025, 0.12, 6), wood, 0, 0.02, 0);
-  } else if (id === 'bow') {
-    // simple curved bow from two angled limbs + string
-    add(new THREE.CylinderGeometry(0.02, 0.03, 0.62, 5), wood, 0, 0.28, 0.06, 0.35, 0, 0);
-    add(new THREE.CylinderGeometry(0.03, 0.02, 0.62, 5), wood, 0, -0.28, 0.06, -0.35, 0, 0);
-    const strGeo = new THREE.CylinderGeometry(0.004, 0.004, 1.05, 3);
-    add(strGeo, new THREE.MeshBasicMaterial({ color: 0xd8ccb0 }), 0, 0, -0.12);
-  } else if (id === 'javelin') {
-    add(new THREE.CylinderGeometry(0.02, 0.025, 1.5, 5), wood, 0, 0.3, 0);
-    add(new THREE.ConeGeometry(0.04, 0.22, 5), iron, 0, 1.15, 0);
-  }
-  return g;
+  return assetClone(id) || new THREE.Group();
 }
 
 export function shieldMesh(round = false) {
-  const g = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color: 0x7a5a36, roughness: 0.8 });
-  const bronze = new THREE.MeshStandardMaterial({ color: BRONZE, roughness: 0.5, metalness: 0.6 });
-  if (round) {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.05, 14), wood);
-    m.rotation.x = Math.PI / 2;
-    g.add(m);
-    const boss = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), bronze);
-    g.add(boss);
-  } else {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.0, 0.06), wood);
-    g.add(m);
-    const boss = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bronze);
-    boss.position.z = 0.05;
-    g.add(boss);
-    const rim = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.04, 0.03), bronze);
-    rim.position.z = -0.02;
-    g.add(rim);
-  }
-  g.traverse((o) => { o.castShadow = true; });
-  return g;
+  return assetClone(round ? 'shield_round' : 'shield_scutum') || new THREE.Group();
 }
 
-// Humanoid body facing +Z (matches forward=(sin face, cos face), rotation.y=face).
-export function makeHumanoid(team, loadout) {
-  const tunic = new THREE.MeshStandardMaterial({ color: TEAM_COLOR[team], roughness: 0.9 });
-  const skin = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.8 });
-  const iron = new THREE.MeshStandardMaterial({ color: IRON, roughness: 0.5, metalness: 0.65 });
-  const cloth = new THREE.MeshStandardMaterial({ color: 0x4a3b28, roughness: 0.95 });
-
+// Puppet assembled from the Blender warrior GLB: named nodes (body, armR/armL
+// shoulder empties, joint-origin leg/arm meshes) stand in for the primitive
+// parts below, so updateMesh keeps driving the exact same pivots.
+function humanoidFromGLB(glb, team, loadout) {
   const group = new THREE.Group();
-  const body = new THREE.Group();
-  group.add(body);
+  group.add(glb);
+  const body = glb.getObjectByName('body');
+  const armR = glb.getObjectByName('armR');
+  const armL = glb.getObjectByName('armL');
+  const legL = glb.getObjectByName('legL');
+  const legR = glb.getObjectByName('legR');
+  const head = glb.getObjectByName('head');
+  const torso = glb.getObjectByName('torso');
 
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.30, 0.5, 3, 8), tunic);
-  torso.position.y = 1.2;
-  body.add(torso);
+  // team tint: clone the shared template material before recoloring
+  let tunic = null;
+  glb.traverse((o) => {
+    if (!tunic && o.isMesh && o.material && o.material.name === 'tunic') {
+      tunic = o.material = o.material.clone();
+      tunic.color.setHex(TEAM_COLOR[team]);
+    }
+  });
 
-  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.12, 8), cloth);
-  belt.position.y = 0.95;
-  body.add(belt);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 10, 8), skin);
-  head.position.y = 1.78;
-  body.add(head);
-
-  const helm = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.3, 8), iron);
-  helm.position.y = 1.95;
-  body.add(helm);
-
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.85, 0.18), cloth);
-  legL.position.set(-0.15, 0.45, 0);
-  const legR = legL.clone();
-  legR.position.x = 0.15;
-  body.add(legL, legR);
-
-  // Right arm holds the weapon; pivot at shoulder.
-  const armR = new THREE.Group();
-  armR.position.set(0.40, 1.52, 0);
-  const armRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.55, 0.13), skin);
-  armRMesh.position.y = -0.22;
-  armR.add(armRMesh);
   const wpn = weaponMesh(loadout.weapon);
   wpn.position.set(0, -0.5, 0.1);
-  wpn.rotation.x = Math.PI / 2.3;   // blade forward
+  wpn.rotation.x = Math.PI / 2.3;
   armR.add(wpn);
-  body.add(armR);
 
-  // Left arm holds the shield (if any).
-  const armL = new THREE.Group();
-  armL.position.set(-0.40, 1.52, 0);
-  const armLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.55, 0.13), skin);
-  armLMesh.position.y = -0.22;
-  armL.add(armLMesh);
   let shield = null;
   if (loadout.shield) {
     shield = shieldMesh(loadout.id === 'spearman');
     shield.position.set(-0.05, -0.45, 0.25);
     armL.add(shield);
   }
-  body.add(armL);
 
-  // Ranged weapon slung on back, plus a copy for the hand when drawn.
   let backWeapon = null, handRanged = null;
   if (loadout.ranged) {
     const id = loadout.ranged === 'bow' ? 'bow' : 'javelin';
@@ -166,6 +81,31 @@ export function makeHumanoid(team, loadout) {
 
   group.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
   return { group, body, torso, head, legL, legR, armR, armL, wpn, shield, tunic, backWeapon, handRanged };
+}
+
+// Headless/test path when the GLB cache is cold: empty pivots so updateMesh
+// and reset() keep their usual handles — no procedural geometry.
+function bareHumanoid() {
+  const group = new THREE.Group();
+  const body = new THREE.Group();
+  group.add(body);
+  const armR = new THREE.Group();
+  const armL = new THREE.Group();
+  const legL = new THREE.Group();
+  const legR = new THREE.Group();
+  body.add(armR, armL, legL, legR);
+  return {
+    group, body, armR, armL, legL, legR,
+    torso: null, head: null, tunic: null,
+    wpn: new THREE.Group(), shield: null, backWeapon: null, handRanged: null,
+  };
+}
+
+// Humanoid body facing +Z (matches forward=(sin face, cos face), rotation.y=face).
+export function makeHumanoid(team, loadout) {
+  const glb = assetClone('warrior');
+  if (glb) return humanoidFromGLB(glb, team, loadout);
+  return bareHumanoid();
 }
 
 // ---------------------------------------------------------------------------
